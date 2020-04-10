@@ -1,33 +1,53 @@
-# This is a basic workflow to help you get started with Actions
+# An example GitHub Action for checking an Ada program
 
 name: CI
 
-# Controls when the action will run. Triggers the workflow on push or pull request
-# events but only for the master branch
+# Trigger the action on pushes and PRs on the master branch
 on:
   push:
     branches: [ master ]
   pull_request:
     branches: [ master ]
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+
 jobs:
-  # This workflow contains a single job called "build"
   build:
-    # The type of runner that the job will run on
     runs-on: ubuntu-latest
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+    # Set up reviewdog
+    - name: Setup reviewdog
+      run: |
+          mkdir -p $HOME/reviewdog/bin && curl -sfL https://raw.githubusercontent.com/reviewdog/reviewdog/master/install.sh| sh -s -- -b $HOME/reviewdog/bin
+
+    # Checkout the repository under $GITHUB_WORKSPACE
     - uses: actions/checkout@v2
+
+    # Install the compiler
     - uses: ada-actions/toolchain@v0.1.0
 
-    # Runs a single command using the runners shell
-    - name: Run a one-line script
-      run: echo Hello, world!
+    # Run gprbuild
+    - name: Run gprbuild
+      env:
+        REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-    # Runs a set of commands using the runners shell
-    - name: Run a multi-line script
       run: |
-        gprbuild -v -Psdc
+        status=0
+
+        # Run gprbuild with
+        #   *  -gnatef to print full path to source files
+        #   *  2>&1 to capture stderr
+        # in the || block, capture the exit status if nonzero
+        gprbuild -v -Psdc -gnatef > output.txt 2>&1 || status=$?
+
+        # Run the output through reviewdog, to decorate the PR
+        cat output.txt | $HOME/reviewdog/bin/reviewdog -efm="%f:%l:%c: %m" -diff="git diff master" --reporter=github-pr-review
+
+        # Check for errors
+        if [ $status -ne 0 ]; then
+           cat output.txt
+           echo "ERROR: gprbuild returned $status"
+
+           # This will cause the workflow to exit with $status
+           bash -c "exit $status"
+        fi
