@@ -15,7 +15,7 @@ package body Values.Operations is
 
       elsif Op = "-" then
          return Sub;
-
+--insert a bad comment
       elsif Op = "*" then
          return Mul;
 
@@ -49,7 +49,7 @@ package body Values.Operations is
             Result := V1.E * V2.E;
 
          when Sub =>
-            Result := V1.E - V2.E;
+            Result := V1.E - V2.E
       end case;
 
       --  Create an integer Value by setting the field "E" of the record
