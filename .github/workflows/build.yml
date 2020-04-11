@@ -26,7 +26,10 @@ jobs:
     # Install the compiler
     - uses: ada-actions/toolchain@v0.1.0
 
-    # Run gprbuild
+    #########
+    # BUILD #
+    #########
+
     - name: Run gprbuild
       env:
         REVIEWDOG_GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -51,3 +54,47 @@ jobs:
            # This will cause the workflow to exit with $status
            bash -c "exit $status"
         fi
+
+    #######################
+    # COVERAGE USING GCOV #
+    #######################
+
+    - name: Run gprbuild with options needed by gcov
+      run: |
+         gprbuild -f -Psdc -cargs -ftest-coverage -fprofile-arcs -gnatws -largs -fprofile-generate
+    
+    - name: Run tests
+      run: |
+         obj/sdc < input.txt
+
+    - name: Collect files
+      run: |
+        mkdir gcov_data
+        for a in `find . -name "*.ad?"` ; do cp $a gcov_data/ ; done
+        cp obj/*gc?? gcov_data/
+
+    - name: Run gcov
+      run: | 
+         cd gcov_data
+         gcov *.ad? 
+         # Remove binder files
+         rm b__*
+         # Remove all gcov files that don't have a source present
+         # (for instance gcov files generated for runtime units)
+         for a in *.gcov ; do
+            if [ ! -f ${a%%.gcov} ]; then
+               rm $a
+            fi
+         done
+         cd ..
+        
+    - name: Collect gcov data
+      run: |
+         touch coverage.txt
+         for a in `ls gcov_data/*.gcov` ; do cat $a | sed -e "s%`pwd`/%%g" >> coverage.txt ; done
+         cat coverage.txt
+
+    - uses: codecov/codecov-action@v1
+      with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          file: gcov_data/*.gcov
