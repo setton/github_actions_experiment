@@ -9,13 +9,13 @@ procedure Sdc is
    File : File_Type;
 begin
    Msg ("Welcome to sdc. Go ahead type your commands ...");
-
+   --introduce an error below
    if Argument_Count = 1 then
       begin
          Open (File, In_File, Argument (1));
       exception
          when Use_Error | Name_Error =>
-            Error_Msg ("Could not open input file, exiting.");
+            Error_Msg ("Could not open input file, exiting.")
             return;
       end;
 
